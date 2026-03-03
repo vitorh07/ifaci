@@ -6,9 +6,24 @@ const api = express();
 api.use(express.json());
 api.use(cors());
 
-// Rota de teste
-api.get('/', (req, res) => {
-    res.send("Hello World!").status(200);
+const dados = []
+
+// Rotas
+api.get('/usuarios', (req, res) => {
+    let usuarios = [{
+        nome: "Gabriel Claro",
+        email: "gabriel.csilva@sp.senai.br",
+        senha: "12345678"
+    },{
+        nome: "André Souza",
+        email: "andre.souza@sp.senai.br",
+        senha: "123456789"
+    },{
+        nome: "Cainã Antunes",
+        email: "caina.antunes@sp.senai.br",
+        senha: "1234567890"
+    }]
+    res.json(usuarios).status(200);
 });
 
 // Rodando o servidor
