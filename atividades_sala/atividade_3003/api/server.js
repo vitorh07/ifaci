@@ -6,107 +6,86 @@ const api = express()
 api.use(express.json())
 api.use(cors())
 
-// ===================== USUARIOS =====================
 const dados = []
+const iot_data = []
+const devices = []
 let id = 0;
 
+
+
+//Rotas
 api.get('/usuarios', (req, res)=>{
-    res.status(200).send(dados)
+    let users = dados;
+
+    res.status(200).send(users)
 })
 
-api.post('/novoUsuario',(req, res)=>{
-    id = id + 1;
-    let user = {
-        id: id,
-        nome_completo: req.body.nome_completo,
-        email: req.body.email,
-        senha: req.body.senha
-    }
-    dados.push(user)
-    res.status(201).send({ code: 201, msg: "Usuário Criado com sucesso!" })
+//Rota de IOT
+api.get('/iot', (req, res)=>{
+    let outputData = iot_data
+    res.status(200).send(outputData)
+})
+//Rota por sensor
+api.get('/sensor/:id', (req, res)=>{
+    let sensor_data = iot_data[req.params.id]
+
+    res.status(201).send(sensor_data)
 })
 
-api.delete('/usuarios/:id', (req, res)=>{
-    const index = dados.findIndex(u => u.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Usuário não encontrado" })
-    dados.splice(index, 1)
-    res.status(200).send({ msg: "Usuário deletado com sucesso!" })
+api.get('/devices',(req, res)=>{
+    let devices = devices;
+
+    res.status(200).send(devices)
 })
 
-api.put('/usuarios/:id', (req, res)=>{
-    const index = dados.findIndex(u => u.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Usuário não encontrado" })
-    dados[index] = { ...dados[index], ...req.body }
-    res.status(200).send({ msg: "Usuário editado com sucesso!" })
-})
 
-// ===================== DISPOSITIVOS =====================
-const dispositivos = []
-let dispositivoId = 0;
+api.post('/newData', (req, res)=>{
+        const { 
+            temperatura,
+            pressao,
+            umidade,
+            sensor_presenca,
+            trava_seguranca, } = req.body
 
-// Listar todos
-api.get('/dispositivos', (req, res)=>{
-    res.status(200).send(dispositivos)
-})
+            id = id+1;
 
-// Criar dispositivo
-api.post('/dispositivos', (req, res)=>{
-    dispositivoId = dispositivoId + 1;
-    const dispositivo = {
-        id: dispositivoId,
-        nome: req.body.nome || `Dispositivo ${dispositivoId}`,
-        status_conexao: "conectado",
-        rele_travado: false,
-        sensores: {
-            temperatura: req.body.sensores?.temperatura ?? 0,
-            pressao: req.body.sensores?.pressao ?? 0,
-            umidade: req.body.sensores?.umidade ?? 0,
-            status_presenca: req.body.sensores?.status_presenca ?? false,
-            status_rele: req.body.sensores?.status_rele ?? false
+        if(req.body === null){
+            return res.status(400).send("Dados não encontrados")
         }
+        else{
+            const newData = {
+            id: id,
+            temperatura,
+            pressao,
+            umidade,
+            sensor_presenca,
+            trava_seguranca,
+        }
+        iot_data.push(newData)
+        return res.status(201).send({ message: 'Dados recebidos com sucesso!' })
+        }
+    })
+
+api.put('/sensor/:id', (req,res)=>{
+    const id = req.params.id
+    const newBody = req.body
+    
+    const index = iot_data.findIndex(p => p.id=== parseInt(id))
+    
+    if(index != -1){
+        iot_data[index] = {id: parseInt(id), ...newBody}
+        return res.status(200).send({
+            "msg":"Dados do sensor atualizados!"
+        })
     }
-    dispositivos.push(dispositivo)
-    res.status(201).send({ code: 201, msg: "Dispositivo criado com sucesso!", dispositivo })
-})
-
-// Editar dispositivo
-api.put('/dispositivos/:id', (req, res)=>{
-    const index = dispositivos.findIndex(d => d.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Dispositivo não encontrado" })
-    dispositivos[index] = {
-        ...dispositivos[index],
-        nome: req.body.nome ?? dispositivos[index].nome,
-        sensores: { ...dispositivos[index].sensores, ...req.body.sensores }
+    else{
+        return res.status(500).send({
+            "msg":"Erro ao atualizar o sensor!"
+        })
     }
-    res.status(200).send({ msg: "Dispositivo atualizado com sucesso!" })
 })
 
-// Deletar dispositivo
-api.delete('/dispositivos/:id', (req, res)=>{
-    const index = dispositivos.findIndex(d => d.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Dispositivo não encontrado" })
-    dispositivos.splice(index, 1)
-    res.status(200).send({ msg: "Dispositivo removido com sucesso!" })
-})
 
-// Comando: liberar/travar relé
-api.patch('/dispositivos/:id/rele', (req, res)=>{
-    const index = dispositivos.findIndex(d => d.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Dispositivo não encontrado" })
-    dispositivos[index].rele_travado = req.body.travar
-    dispositivos[index].sensores.status_rele = req.body.travar
-    const acao = req.body.travar ? "travado" : "liberado"
-    res.status(200).send({ msg: `Relé ${acao} com sucesso!` })
-})
-
-// Comando: liberar/travar conexão
-api.patch('/dispositivos/:id/conexao', (req, res)=>{
-    const index = dispositivos.findIndex(d => d.id === parseInt(req.params.id))
-    if (index === -1) return res.status(404).send({ msg: "Dispositivo não encontrado" })
-    dispositivos[index].status_conexao = req.body.travar ? "desconectado" : "conectado"
-    const acao = req.body.travar ? "travada" : "liberada"
-    res.status(200).send({ msg: `Conexão ${acao} com sucesso!` })
-})
 
 const porta = 8080;
 api.listen(porta, ()=>{
