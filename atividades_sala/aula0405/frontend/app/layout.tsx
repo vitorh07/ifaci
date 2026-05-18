@@ -1,15 +1,32 @@
-import CriarUsuario from "./components/CriarUsuario"
-import Header from "./components/Header"
-import ListarUsuario from "./components/ListarUsuario"
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
-export default function Home(){
-  return(
-    <div>
-      <Header name="Gerenciar Usuários"/>
-      <div className="flex gap-4 p-4">
-        <CriarUsuario/>
-        <ListarUsuario/>
-      </div>
-    </div>
-  )
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "HMI Industrial",
+  description: "Sistema de gerenciamento industrial",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="pt-BR">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
 }
