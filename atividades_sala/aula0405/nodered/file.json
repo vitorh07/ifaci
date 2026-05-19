@@ -1,81 +1,41 @@
 [
     {
-        "id": "c1a9f7c0e5b01a01",
+        "id": "279cb016cd3f4a00",
+        "type": "comment",
+        "z": "828ffb7ced72b6b6",
+        "name": "Leitura de Sensores OPC-UA → API",
+        "info": "",
+        "x": 160,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "d47e7ab34b580fad",
+        "type": "comment",
+        "z": "828ffb7ced72b6b6",
+        "name": "Escrita de Valores",
+        "info": "",
+        "x": 110,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "inject_ler_sensores",
         "type": "inject",
         "z": "828ffb7ced72b6b6",
-        "name": "Ler Temperatura",
-        "props": [
-            {
-                "p": "topic",
-                "vt": "str"
-            }
-        ],
+        "name": "Ler Temperatura (2s)",
+        "props": [{ "p": "topic", "vt": "str" }],
         "repeat": "2",
         "crontab": "",
         "once": true,
         "onceDelay": 0.5,
         "topic": "ns=2;i=2",
-        "x": 150,
+        "x": 160,
         "y": 100,
-        "wires": [
-            [
-                "8fd5a1c2ff83807a"
-            ]
-        ]
+        "wires": [["opcua_client_read"]]
     },
     {
-        "id": "b7c91c7b6f02e202",
-        "type": "OpcUa-Item",
-        "z": "828ffb7ced72b6b6",
-        "item": "ns=2;i=2",
-        "datatype": "Float",
-        "value": "",
-        "name": "OPC-UA READ Temperature",
-        "x": 660,
-        "y": 220,
-        "wires": [
-            [
-                "d4f3e72f91a0c303"
-            ]
-        ]
-    },
-    {
-        "id": "d4f3e72f91a0c303",
-        "type": "function",
-        "z": "828ffb7ced72b6b6",
-        "name": "Formatar saída",
-        "func": "let raw = msg.payload;\nlet value = null;\n\n// Caso 1: payload vem como objeto OPC-UA completo\nif (raw && typeof raw === \"object\") {\n\n    // FreeOpcUa + node-red-contrib-opcua (mais comum)\n    if (raw.value !== undefined) {\n\n        // Às vezes value vem encapsulado\n        if (typeof raw.value === \"object\" && raw.value.value !== undefined) {\n            value = raw.value.value;\n        } else {\n            value = raw.value;\n        }\n\n    } else {\n        msg.payload = {\n            erro: \"Objeto OPC-UA sem campo value\",\n            rawPayload: raw,\n            nodeId: msg.topic\n        };\n        return msg;\n    }\n}\n\n// Caso 2: payload vem direto\nelse {\n    value = raw;\n}\n\n// Validação final\nif (value === null || value === undefined || isNaN(value)) {\n    msg.payload = {\n        erro: \"Valor inválido recebido\",\n        valorRecebido: value,\n        rawPayload: raw,\n        nodeId: msg.topic\n    };\n    return msg;\n}\n\n// Saída amigável\nmsg.payload = {\n    tag: \"Temperatura\",\n    valor: Number(value).toFixed(2),\n    unidade: \"°C\",\n    nodeId: msg.topic,\n    timestamp: new Date().toLocaleString(\"pt-BR\")\n};\n\nreturn msg;\n",
-        "outputs": 1,
-        "timeout": "",
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 920,
-        "y": 140,
-        "wires": [
-            [
-                "3d2e8a4f7c01a404"
-            ]
-        ]
-    },
-    {
-        "id": "3d2e8a4f7c01a404",
-        "type": "debug",
-        "z": "828ffb7ced72b6b6",
-        "name": "Debug Temperatura",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "x": 1200,
-        "y": 120,
-        "wires": []
-    },
-    {
-        "id": "8fd5a1c2ff83807a",
+        "id": "opcua_client_read",
         "type": "OpcUa-Client",
         "z": "828ffb7ced72b6b6",
         "endpoint": "7dc742813128b22e",
@@ -96,29 +56,349 @@
         "sendBufferSize": 8192,
         "setstatusandtime": false,
         "keepsessionalive": false,
-        "name": "",
+        "name": "OpcUa-Client READ Temp",
         "applicationName": "",
         "applicationUri": "",
         "x": 400,
-        "y": 160,
-        "wires": [
-            [
-                "b7c91c7b6f02e202"
-            ],
-            [],
-            []
-        ]
+        "y": 100,
+        "wires": [["opcua_item_temp"], [], []]
+    },
+    {
+        "id": "opcua_item_temp",
+        "type": "OpcUa-Item",
+        "z": "828ffb7ced72b6b6",
+        "item": "ns=2;i=2",
+        "datatype": "Double",
+        "value": "",
+        "name": "Temperature ns=2;i=2",
+        "x": 640,
+        "y": 100,
+        "wires": [["fn_extrair_temp"]]
+    },
+    {
+        "id": "fn_extrair_temp",
+        "type": "function",
+        "z": "828ffb7ced72b6b6",
+        "name": "Extrair Temperatura",
+        "func": "let raw = msg.payload;\nlet value = (raw && raw.value !== undefined) ? (typeof raw.value === 'object' ? raw.value.value : raw.value) : raw;\nflow.set('temperatura', (value !== null && !isNaN(value)) ? parseFloat(Number(value).toFixed(2)) : 0);\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 100,
+        "wires": [["debug_temp"]]
+    },
+    {
+        "id": "debug_temp",
+        "type": "debug",
+        "z": "828ffb7ced72b6b6",
+        "name": "Debug Temperatura",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1120,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "inject_ler_pressao",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Ler Pressão (2s)",
+        "props": [{ "p": "topic", "vt": "str" }],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.7,
+        "topic": "ns=2;i=3",
+        "x": 160,
+        "y": 180,
+        "wires": [["opcua_client_read_pressao"]]
+    },
+    {
+        "id": "opcua_client_read_pressao",
+        "type": "OpcUa-Client",
+        "z": "828ffb7ced72b6b6",
+        "endpoint": "7dc742813128b22e",
+        "action": "read",
+        "deadbandtype": "a",
+        "deadbandvalue": 1,
+        "time": 10,
+        "timeUnit": "s",
+        "certificate": "n",
+        "localfile": "",
+        "localkeyfile": "",
+        "securitymode": "None",
+        "securitypolicy": "None",
+        "useTransport": false,
+        "maxChunkCount": 1,
+        "maxMessageSize": 8192,
+        "receiveBufferSize": 8192,
+        "sendBufferSize": 8192,
+        "setstatusandtime": false,
+        "keepsessionalive": false,
+        "name": "OpcUa-Client READ Pressão",
+        "applicationName": "",
+        "applicationUri": "",
+        "x": 400,
+        "y": 180,
+        "wires": [["opcua_item_pressao"], [], []]
+    },
+    {
+        "id": "opcua_item_pressao",
+        "type": "OpcUa-Item",
+        "z": "828ffb7ced72b6b6",
+        "item": "ns=2;i=3",
+        "datatype": "Double",
+        "value": "",
+        "name": "Pressure ns=2;i=3",
+        "x": 640,
+        "y": 180,
+        "wires": [["fn_extrair_pressao"]]
+    },
+    {
+        "id": "fn_extrair_pressao",
+        "type": "function",
+        "z": "828ffb7ced72b6b6",
+        "name": "Extrair Pressão",
+        "func": "let raw = msg.payload;\nlet value = (raw && raw.value !== undefined) ? (typeof raw.value === 'object' ? raw.value.value : raw.value) : raw;\nflow.set('pressao', (value !== null && !isNaN(value)) ? parseFloat(Number(value).toFixed(2)) : 0);\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 180,
+        "wires": [["debug_pressao"]]
+    },
+    {
+        "id": "debug_pressao",
+        "type": "debug",
+        "z": "828ffb7ced72b6b6",
+        "name": "Debug Pressão",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1120,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "inject_ler_running",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Ler Running (2s)",
+        "props": [{ "p": "topic", "vt": "str" }],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.9,
+        "topic": "ns=2;i=4",
+        "x": 160,
+        "y": 260,
+        "wires": [["opcua_client_read_running"]]
+    },
+    {
+        "id": "opcua_client_read_running",
+        "type": "OpcUa-Client",
+        "z": "828ffb7ced72b6b6",
+        "endpoint": "7dc742813128b22e",
+        "action": "read",
+        "deadbandtype": "a",
+        "deadbandvalue": 1,
+        "time": 10,
+        "timeUnit": "s",
+        "certificate": "n",
+        "localfile": "",
+        "localkeyfile": "",
+        "securitymode": "None",
+        "securitypolicy": "None",
+        "useTransport": false,
+        "maxChunkCount": 1,
+        "maxMessageSize": 8192,
+        "receiveBufferSize": 8192,
+        "sendBufferSize": 8192,
+        "setstatusandtime": false,
+        "keepsessionalive": false,
+        "name": "OpcUa-Client READ Running",
+        "applicationName": "",
+        "applicationUri": "",
+        "x": 400,
+        "y": 260,
+        "wires": [["opcua_item_running"], [], []]
+    },
+    {
+        "id": "opcua_item_running",
+        "type": "OpcUa-Item",
+        "z": "828ffb7ced72b6b6",
+        "item": "ns=2;i=4",
+        "datatype": "Boolean",
+        "value": "",
+        "name": "Running ns=2;i=4",
+        "x": 640,
+        "y": 260,
+        "wires": [["fn_extrair_running"]]
+    },
+    {
+        "id": "fn_extrair_running",
+        "type": "function",
+        "z": "828ffb7ced72b6b6",
+        "name": "Extrair Running",
+        "func": "let raw = msg.payload;\nlet value = (raw && raw.value !== undefined) ? (typeof raw.value === 'object' ? raw.value.value : raw.value) : raw;\nflow.set('running', value === true || value === 'true');\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 260,
+        "wires": [["debug_running"]]
+    },
+    {
+        "id": "debug_running",
+        "type": "debug",
+        "z": "828ffb7ced72b6b6",
+        "name": "Debug Running",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 1120,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "inject_enviar_api",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Enviar para API (2s)",
+        "props": [{ "p": "payload", "vt": "str" }],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 1.5,
+        "topic": "",
+        "payload": "trigger",
+        "payloadType": "str",
+        "x": 160,
+        "y": 360,
+        "wires": [["fn_montar_body"]]
+    },
+    {
+        "id": "fn_montar_body",
+        "type": "function",
+        "z": "828ffb7ced72b6b6",
+        "name": "Montar body API",
+        "func": "msg.payload = {\n    temperatura: flow.get('temperatura') || 0,\n    pressao:     flow.get('pressao')     || 0,\n    umidade:     0,\n    sensor_presenca: flow.get('running') || false,\n    trava_seguranca: false\n};\nmsg.headers = { 'Content-Type': 'application/json' };\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 360,
+        "wires": [["http_request_001"]]
+    },
+    {
+        "id": "http_request_001",
+        "type": "http request",
+        "z": "828ffb7ced72b6b6",
+        "name": "POST /newData",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://host.docker.internal:8080/newData",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 620,
+        "y": 360,
+        "wires": [["debug_api_resp_001"]]
+    },
+    {
+        "id": "debug_api_resp_001",
+        "type": "debug",
+        "z": "828ffb7ced72b6b6",
+        "name": "Debug API Response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 860,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "efebecbcd536eab4",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Temperatura",
+        "props": [{ "p": "payload" }],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "22.4",
+        "payloadType": "str",
+        "x": 130,
+        "y": 540,
+        "wires": [["172173948882a9d9"]]
+    },
+    {
+        "id": "172173948882a9d9",
+        "type": "function",
+        "z": "828ffb7ced72b6b6",
+        "name": "Converter para Number",
+        "func": "msg.payload = Number(msg.payload);\nif (isNaN(msg.payload)) { node.error('Valor inválido', msg); return null; }\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 540,
+        "wires": [["847c572e7423a002"]]
+    },
+    {
+        "id": "847c572e7423a002",
+        "type": "OpcUa-Item",
+        "z": "828ffb7ced72b6b6",
+        "item": "ns=2;i=2",
+        "datatype": "Double",
+        "value": "",
+        "name": "Temperature",
+        "x": 620,
+        "y": 540,
+        "wires": [["opcua_client_write"]]
     },
     {
         "id": "b1f7a9c6a1d1a001",
         "type": "inject",
         "z": "828ffb7ced72b6b6",
         "name": "Pressão",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
+        "props": [{ "p": "payload" }],
         "repeat": "",
         "crontab": "",
         "once": false,
@@ -128,31 +408,23 @@
         "payloadType": "str",
         "x": 120,
         "y": 620,
-        "wires": [
-            [
-                "7d6e58d0b8d7a002"
-            ]
-        ]
+        "wires": [["7d6e58d0b8d7a002"]]
     },
     {
         "id": "7d6e58d0b8d7a002",
         "type": "function",
         "z": "828ffb7ced72b6b6",
         "name": "Converter para Number",
-        "func": "// Garante que o valor seja numérico\nmsg.payload = Number(msg.payload);\n\nif (isNaN(msg.payload)) {\n    node.error(\"Valor inválido para escrita OPC-UA\", msg);\n    return null;\n}\n\nreturn msg;",
+        "func": "msg.payload = Number(msg.payload);\nif (isNaN(msg.payload)) { node.error('Valor inválido', msg); return null; }\nreturn msg;",
         "outputs": 1,
         "timeout": "",
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 410,
+        "x": 380,
         "y": 620,
-        "wires": [
-            [
-                "d3c0c5a7e7e8a003"
-            ]
-        ]
+        "wires": [["d3c0c5a7e7e8a003"]]
     },
     {
         "id": "d3c0c5a7e7e8a003",
@@ -162,16 +434,58 @@
         "datatype": "Double",
         "value": "",
         "name": "Pressure",
-        "x": 660,
+        "x": 620,
         "y": 620,
-        "wires": [
-            [
-                "a4f0b1a3c6e2a004"
-            ]
-        ]
+        "wires": [["opcua_client_write"]]
     },
     {
-        "id": "a4f0b1a3c6e2a004",
+        "id": "08607723d9ad23eb",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Enviar True",
+        "props": [{ "p": "payload" }],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 120,
+        "y": 700,
+        "wires": [["820adea28c9d027f"]]
+    },
+    {
+        "id": "00ddacdacc191f12",
+        "type": "inject",
+        "z": "828ffb7ced72b6b6",
+        "name": "Enviar False",
+        "props": [{ "p": "payload" }],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "false",
+        "payloadType": "bool",
+        "x": 120,
+        "y": 740,
+        "wires": [["820adea28c9d027f"]]
+    },
+    {
+        "id": "820adea28c9d027f",
+        "type": "OpcUa-Item",
+        "z": "828ffb7ced72b6b6",
+        "item": "ns=2;i=4",
+        "datatype": "Boolean",
+        "value": "",
+        "name": "Status",
+        "x": 380,
+        "y": 720,
+        "wires": [["opcua_client_write"]]
+    },
+    {
+        "id": "opcua_client_write",
         "type": "OpcUa-Client",
         "z": "828ffb7ced72b6b6",
         "endpoint": "7dc742813128b22e",
@@ -189,169 +503,18 @@
         "sendBufferSize": "",
         "setstatusandtime": false,
         "keepsessionalive": false,
-        "name": "OPC-UA Client",
+        "name": "OpcUa-Client WRITE",
         "applicationName": "",
         "applicationUri": "",
-        "x": 930,
-        "y": 620,
-        "wires": [
-            [],
-            [],
-            []
-        ]
-    },
-    {
-        "id": "08607723d9ad23eb",
-        "type": "inject",
-        "z": "828ffb7ced72b6b6",
-        "name": "Enviar True",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "true",
-        "payloadType": "bool",
-        "x": 120,
-        "y": 740,
-        "wires": [
-            [
-                "820adea28c9d027f"
-            ]
-        ]
-    },
-    {
-        "id": "820adea28c9d027f",
-        "type": "OpcUa-Item",
-        "z": "828ffb7ced72b6b6",
-        "item": "ns=2;i=4",
-        "datatype": "Boolean",
-        "value": "",
-        "name": "Status",
-        "x": 610,
-        "y": 760,
-        "wires": [
-            [
-                "a4f0b1a3c6e2a004"
-            ]
-        ]
-    },
-    {
-        "id": "00ddacdacc191f12",
-        "type": "inject",
-        "z": "828ffb7ced72b6b6",
-        "name": "Enviar False",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "false",
-        "payloadType": "bool",
-        "x": 130,
-        "y": 800,
-        "wires": [
-            [
-                "820adea28c9d027f"
-            ]
-        ]
-    },
-    {
-        "id": "efebecbcd536eab4",
-        "type": "inject",
-        "z": "828ffb7ced72b6b6",
-        "name": "Temperatura",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "22.4",
-        "payloadType": "str",
-        "x": 130,
-        "y": 540,
-        "wires": [
-            [
-                "172173948882a9d9"
-            ]
-        ]
-    },
-    {
-        "id": "172173948882a9d9",
-        "type": "function",
-        "z": "828ffb7ced72b6b6",
-        "name": "Converter para Number",
-        "func": "// Garante que o valor seja numérico\nmsg.payload = Number(msg.payload);\n\nif (isNaN(msg.payload)) {\n    node.error(\"Valor inválido para escrita OPC-UA\", msg);\n    return null;\n}\n\nreturn msg;",
-        "outputs": 1,
-        "timeout": "",
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 410,
-        "y": 540,
-        "wires": [
-            [
-                "847c572e7423a002"
-            ]
-        ]
-    },
-    {
-        "id": "847c572e7423a002",
-        "type": "OpcUa-Item",
-        "z": "828ffb7ced72b6b6",
-        "item": "ns=2;i=2",
-        "datatype": "Double",
-        "value": "",
-        "name": "Temperature",
-        "x": 670,
-        "y": 540,
-        "wires": [
-            [
-                "a4f0b1a3c6e2a004"
-            ]
-        ]
-    },
-    {
-        "id": "279cb016cd3f4a00",
-        "type": "comment",
-        "z": "828ffb7ced72b6b6",
-        "name": "Leitura de Temperatura",
-        "info": "",
-        "x": 120,
-        "y": 40,
-        "wires": []
-    },
-    {
-        "id": "d47e7ab34b580fad",
-        "type": "comment",
-        "z": "828ffb7ced72b6b6",
-        "name": "Escrita de Valores",
-        "info": "",
-        "x": 110,
-        "y": 460,
-        "wires": []
+        "x": 620,
+        "y": 720,
+        "wires": [[], [], []]
     },
     {
         "id": "7dc742813128b22e",
         "type": "OpcUa-Endpoint",
         "name": "FreeOpcUa",
-        "endpoint": "opc.tcp://0.0.0.0:4840",
+        "endpoint": "opc.tcp://host.docker.internal:4840",
         "secpol": "None",
         "secmode": "None",
         "none": true,

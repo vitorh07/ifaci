@@ -5,3 +5,5 @@ services:
     container_name: nodered-ifaci
     ports:
       - "1880:1880"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

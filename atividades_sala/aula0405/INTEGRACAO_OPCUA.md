@@ -126,48 +126,48 @@ Saída formatada:
 }
 ```
 
-### Rotas que o frontend usa mas **não existem ainda**
-
-| Método | Rota                          | Usado em                  |
-|--------|-------------------------------|---------------------------|
-| GET    | `/dispositivos`               | `ListarDispositivos.tsx`  |
-| POST   | `/dispositivos`               | `CriarDispositivo.tsx`    |
-| PUT    | `/dispositivos/:id`           | `ListarDispositivos.tsx`  |
-| DELETE | `/dispositivos/:id`           | `ListarDispositivos.tsx`  |
-| PATCH  | `/dispositivos/:id/rele`      | `ListarDispositivos.tsx`  |
-| PATCH  | `/dispositivos/:id/conexao`   | `ListarDispositivos.tsx`  |
+### Observação
+O frontend atual **não consome** os dados de `/iot`. Precisa criar componente para exibir os dados do OPC-UA em tempo real.
 
 ---
 
 ## 4. Frontend Next.js
 
-### Página `/dispositivos`
-Componentes: `CriarDispositivo` + `ListarDispositivos`
+### Estado atual
+- **Página principal** (`/`): Gerenciador de Usuários
+- **Componentes existentes**:
+  - `CriarUsuario.tsx` - formulário de criação (sem lógica implementada)
+  - `ListarUsuario.tsx` - listagem estática (sem integração com API)
+  - `Header.tsx` - cabeçalho simples
 
-### Tipo `Dispositivo` esperado pelo frontend
+### O que precisa ser criado
+
+#### Página `/iot` ou `/dashboard`
+Para exibir dados em tempo real do OPC-UA via API
+
+#### Componente `DashboardIoT.tsx`
+```tsx
+// Buscar dados de GET /iot a cada 3 segundos
+// Exibir última leitura de temperatura, pressão, running
+```
+
+#### Tipo esperado da API `/iot`
 ```ts
-type Sensores = {
+type IoTData = {
+  id: number
   temperatura: number
   pressao: number
   umidade: number
-  status_presenca: boolean
-  status_rele: boolean
-}
-
-type Dispositivo = {
-  id: number
-  nome: string
-  status_conexao: string   // "conectado" | "desconectado"
-  rele_travado: boolean
-  sensores: Sensores
+  sensor_presenca: boolean
+  trava_seguranca: boolean
 }
 ```
 
-### O que o frontend já faz
-- Busca dispositivos a cada **3 segundos** (`setInterval`)
-- Exibe temperatura, pressão, umidade, presença e status do relé
-- Comandos de travar/liberar relé e conexão via PATCH
-- Modal de edição de dispositivo
+### Opcional: Página de dispositivos
+Se quiser criar CRUD completo de dispositivos (como na `atividade_3003`), precisa:
+- Criar rotas `/dispositivos` na API
+- Criar componentes `CriarDispositivo` e `ListarDispositivos`
+- Adicionar navegação no Header
 
 ---
 
@@ -223,19 +223,18 @@ services:
 - [ ] Ajustar endpoint OPC-UA para `opc.tcp://opcua-server:4840` se usar Docker
 
 ### API (`server.js`)
-- [ ] Criar array `dispositivos` e rotas CRUD completas:
-  - `GET /dispositivos`
-  - `POST /dispositivos`
-  - `PUT /dispositivos/:id`
-  - `DELETE /dispositivos/:id`
-  - `PATCH /dispositivos/:id/rele`
-  - `PATCH /dispositivos/:id/conexao`
-- [ ] Corrigir bug da variável `devices` sombreada
+- [ ] Implementar lógica de usuários (rotas já existem mas sem funcionalidade completa)
+- [ ] Opcional: criar array `dispositivos` e rotas CRUD se quiser expandir para gerenciamento de dispositivos
+- [ ] Corrigir bug da variável `devices` sombreada na linha 6
 - [ ] Criar `Dockerfile` em `api/`
 
 ### Frontend
-- [ ] Criar página/componente para exibir dados de `/iot` (dados brutos do OPC-UA)
-- [ ] Opcional: polling em `/iot` para mostrar temperatura e pressão em tempo real
+- [ ] Implementar lógica em `CriarUsuario.tsx` (POST para `/usuarios`)
+- [ ] Implementar lógica em `ListarUsuario.tsx` (GET de `/usuarios`, DELETE, PUT)
+- [ ] **Criar componente `DashboardIoT.tsx`** para exibir dados de `/iot` em tempo real
+- [ ] Criar página `/iot` ou `/dashboard` para visualizar temperatura, pressão, running
+- [ ] Adicionar polling (useEffect com setInterval) para buscar `/iot` a cada 3-5 segundos
+- [ ] Criar `Dockerfile` em `frontend/`
 
 ### Docker Compose
 - [ ] Adicionar serviços `opcua-server`, `api` e `frontend`
