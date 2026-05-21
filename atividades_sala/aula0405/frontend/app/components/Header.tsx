@@ -9,6 +9,7 @@ export default function Header({name}:Iprops){
             <span className="flex gap-[2vw]">
                 <a href="/">Usuários</a>
                 <a href="/devices">Dispositivos</a>
+                <a href="/dashboard">Dashboard</a>
             </span>
         </div>
     )
