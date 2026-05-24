@@ -1,119 +1,260 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
-interface SensorData {
-  id: number
-  temperatura: number
-  pressao: number
-  umidade: number
-  sensor_presenca: boolean
-  trava_seguranca: boolean
+interface Device {
+    id: number
+    nome: string
+    tipo: string
+    ip: string
+    descricao: string
+    status: "online" | "offline" | "alerta"
+    criadoEm: string
 }
 
-export default function ListarDispositivos() {
-  const [sensorData, setSensorData] = useState<SensorData | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
+interface Props {
+    refresh: number
+}
 
-  const atualizaSensores = async () => {
-    try {
-      const resposta = await fetch("http://localhost:8080/iot")
-      if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
-      const json: SensorData[] = await resposta.json()
-      if (json.length > 0) setSensorData(json[json.length - 1])
-      setErro(null)
-    } catch (error) {
-      setErro("Erro ao buscar dados da API")
+const STATUS_CONFIG = {
+    online:  { cor: "#00ff88", label: "ONLINE",  bg: "bg-[#00ff8815]", border: "border-[#00ff88]" },
+    offline: { cor: "#ff4444", label: "OFFLINE", bg: "bg-[#ff444415]", border: "border-[#ff4444]" },
+    alerta:  { cor: "#ffaa00", label: "ALERTA",  bg: "bg-[#ffaa0015]", border: "border-[#ffaa00]" },
+}
+
+export default function ListarDispositivos({ refresh }: Props) {
+    const [devices, setDevices] = useState<Device[]>([])
+    const [erro, setErro] = useState<string | null>(null)
+    const [modalAberto, setModalAberto] = useState(false)
+    const [editForm, setEditForm] = useState({ nome: "", tipo: "", ip: "", descricao: "" })
+    const editId = useRef(0)
+
+    const tiposDispositivo = [
+        "Sensor de Temperatura", "Sensor de Pressão", "Sensor de Umidade",
+        "Sensor de Presença", "Controlador PLC", "Atuador / Relé", "Gateway OPC-UA", "Outro",
+    ]
+
+    const buscar = async () => {
+        try {
+            const res = await fetch("http://localhost:8080/devices")
+            if (!res.ok) throw new Error()
+            setDevices(await res.json())
+            setErro(null)
+        } catch {
+            setErro("Erro ao buscar dispositivos")
+        }
     }
-  }
 
-  useEffect(() => {
-    atualizaSensores()
-    const intervalo = setInterval(atualizaSensores, 2000)
-    return () => clearInterval(intervalo)
-  }, [])
+    const deletar = async (id: number) => {
+        if (!confirm("Remover dispositivo?")) return
+        await fetch(`http://localhost:8080/devices/${id}`, { method: "DELETE" })
+        buscar()
+    }
 
-  return (
-    <div className="w-[50vw] max-h-[88vh] overflow-y-auto bg-white text-black rounded-xl flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Leitura dos Sensores</h2>
-        <span className="text-xs text-gray-400">Atualiza a cada 2s</span>
-      </div>
+    const alterarStatus = async (id: number, status: Device["status"]) => {
+        await fetch(`http://localhost:8080/devices/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+        })
+        buscar()
+    }
 
-      {erro && (
-        <div className="bg-red-100 border border-red-400 text-red-700 rounded-lg p-3 text-sm">
-          {erro}
+    const abrirModal = (d: Device) => {
+        editId.current = d.id
+        setEditForm({ nome: d.nome, tipo: d.tipo, ip: d.ip, descricao: d.descricao })
+        setModalAberto(true)
+    }
+
+    const salvarEdicao = async () => {
+        await fetch(`http://localhost:8080/devices/${editId.current}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(editForm),
+        })
+        setModalAberto(false)
+        buscar()
+    }
+
+    useEffect(() => { buscar() }, [refresh])
+
+    return (
+        <div className="flex-1 max-h-[88vh] overflow-y-auto flex flex-col gap-3">
+
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-[#00ff88] rounded-sm" />
+                    <h2 className="text-xs font-mono text-[#00ff88] tracking-widest uppercase">
+                        Dispositivos Registrados
+                    </h2>
+                </div>
+                <span className="text-[10px] font-mono text-[#484f58]">
+                    {devices.length} unidade{devices.length !== 1 ? "s" : ""}
+                </span>
+            </div>
+
+            {erro && (
+                <div className="text-xs font-mono px-3 py-2 rounded border bg-[#ff444415] border-[#ff4444] text-[#ff4444]">
+                    ✗ {erro}
+                </div>
+            )}
+
+            {devices.length === 0 && !erro && (
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6 text-center">
+                    <p className="text-xs font-mono text-[#484f58] tracking-wider">
+                        NENHUM DISPOSITIVO REGISTRADO
+                    </p>
+                </div>
+            )}
+
+            {devices.map(d => {
+                const s = STATUS_CONFIG[d.status] ?? STATUS_CONFIG.offline
+                return (
+                    <div key={d.id}
+                        className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 flex flex-col gap-3
+                                   hover:border-[#484f58] transition-colors">
+
+                        {/* Linha superior */}
+                        <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full shadow-sm"
+                                    style={{ backgroundColor: s.cor, boxShadow: `0 0 6px ${s.cor}` }} />
+                                <span className="text-sm font-semibold text-[#e6edf3]">{d.nome}</span>
+                                <span className="text-[10px] font-mono text-[#484f58]">#{d.id}</span>
+                            </div>
+                            <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${s.bg} ${s.border}`}
+                                style={{ color: s.cor }}>
+                                {s.label}
+                            </span>
+                        </div>
+
+                        {/* Dados */}
+                        <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                            <div className="bg-[#0d1117] rounded px-2 py-1.5 border border-[#30363d]">
+                                <p className="text-[#484f58] uppercase tracking-wider text-[9px] mb-0.5">Tipo</p>
+                                <p className="text-[#8b949e]">{d.tipo}</p>
+                            </div>
+                            <div className="bg-[#0d1117] rounded px-2 py-1.5 border border-[#30363d]">
+                                <p className="text-[#484f58] uppercase tracking-wider text-[9px] mb-0.5">IP / Node</p>
+                                <p className="text-[#00d4ff]">{d.ip || "—"}</p>
+                            </div>
+                            <div className="bg-[#0d1117] rounded px-2 py-1.5 border border-[#30363d]">
+                                <p className="text-[#484f58] uppercase tracking-wider text-[9px] mb-0.5">Registrado</p>
+                                <p className="text-[#8b949e]">
+                                    {new Date(d.criadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                                </p>
+                            </div>
+                        </div>
+
+                        {d.descricao && (
+                            <p className="text-[11px] font-mono text-[#484f58] border-l-2 border-[#30363d] pl-2">
+                                {d.descricao}
+                            </p>
+                        )}
+
+                        {/* Ações */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-[#30363d]">
+                            <span className="text-[9px] font-mono text-[#484f58] uppercase tracking-wider mr-1">
+                                Status:
+                            </span>
+                            {(["online", "offline", "alerta"] as Device["status"][]).map(st => {
+                                const cfg = STATUS_CONFIG[st]
+                                return (
+                                    <button key={st} onClick={() => alterarStatus(d.id, st)}
+                                        className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-all cursor-pointer
+                                            ${d.status === st
+                                                ? `${cfg.bg} ${cfg.border}`
+                                                : "bg-transparent border-[#30363d] text-[#484f58] hover:border-[#8b949e]"
+                                            }`}
+                                        style={d.status === st ? { color: cfg.cor } : {}}>
+                                        {cfg.label}
+                                    </button>
+                                )
+                            })}
+
+                            <div className="flex-1" />
+
+                            <button onClick={() => abrirModal(d)}
+                                className="text-[10px] font-mono px-3 py-1 rounded border border-[#00d4ff30]
+                                           text-[#00d4ff] hover:bg-[#00d4ff15] transition-colors cursor-pointer">
+                                Editar
+                            </button>
+                            <button onClick={() => deletar(d.id)}
+                                className="text-[10px] font-mono px-3 py-1 rounded border border-[#ff444430]
+                                           text-[#ff4444] hover:bg-[#ff444415] transition-colors cursor-pointer">
+                                Remover
+                            </button>
+                        </div>
+                    </div>
+                )
+            })}
+
+            {/* Modal de edição */}
+            {modalAberto && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6 w-[420px] flex flex-col gap-4">
+                        <div className="flex items-center gap-2 border-b border-[#30363d] pb-3">
+                            <div className="w-1.5 h-4 bg-[#ffaa00] rounded-sm" />
+                            <h2 className="text-xs font-mono text-[#ffaa00] tracking-widest uppercase">
+                                Editar Dispositivo #{editId.current}
+                            </h2>
+                        </div>
+
+                        {[
+                            { label: "Nome", key: "nome", type: "text", placeholder: "Nome do dispositivo" },
+                            { label: "IP / Node ID", key: "ip", type: "text", placeholder: "192.168.1.10 ou ns=2;i=2" },
+                        ].map(f => (
+                            <div key={f.key} className="flex flex-col gap-1">
+                                <label className="text-[10px] font-mono text-[#8b949e] tracking-widest uppercase">
+                                    {f.label}
+                                </label>
+                                <input type={f.type}
+                                    value={editForm[f.key as keyof typeof editForm]}
+                                    onChange={e => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                                    placeholder={f.placeholder}
+                                    className="bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm font-mono
+                                               rounded px-3 py-2 focus:outline-none focus:border-[#ffaa00] transition-colors
+                                               placeholder:text-[#484f58]"
+                                />
+                            </div>
+                        ))}
+
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-mono text-[#8b949e] tracking-widest uppercase">Tipo</label>
+                            <select value={editForm.tipo}
+                                onChange={e => setEditForm({ ...editForm, tipo: e.target.value })}
+                                className="bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm font-mono
+                                           rounded px-3 py-2 focus:outline-none focus:border-[#ffaa00] transition-colors">
+                                {tiposDispositivo.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-mono text-[#8b949e] tracking-widest uppercase">Descrição</label>
+                            <textarea value={editForm.descricao}
+                                onChange={e => setEditForm({ ...editForm, descricao: e.target.value })}
+                                rows={2}
+                                className="bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm font-mono
+                                           rounded px-3 py-2 focus:outline-none focus:border-[#ffaa00] transition-colors
+                                           resize-none placeholder:text-[#484f58]"
+                            />
+                        </div>
+
+                        <div className="flex gap-3 justify-end pt-1">
+                            <button onClick={salvarEdicao}
+                                className="text-xs font-mono px-4 py-2 rounded border border-[#ffaa00]
+                                           text-[#ffaa00] hover:bg-[#ffaa0015] transition-colors cursor-pointer tracking-wider">
+                                [ Salvar ]
+                            </button>
+                            <button onClick={() => setModalAberto(false)}
+                                className="text-xs font-mono px-4 py-2 rounded border border-[#30363d]
+                                           text-[#8b949e] hover:border-[#ff4444] hover:text-[#ff4444] transition-colors cursor-pointer tracking-wider">
+                                [ Cancelar ]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-      )}
-
-      {!sensorData && !erro && (
-        <p className="text-gray-400 text-sm">Aguardando dados do OPC-UA...</p>
-      )}
-
-      {sensorData && (
-        <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Sensor Industrial</h3>
-            <span className="text-xs text-gray-500">ID #{sensorData.id}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Temperatura */}
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Temperatura</p>
-              <p className="text-2xl font-bold text-orange-500">
-                {sensorData.temperatura?.toFixed(2)}
-                <span className="text-sm font-normal text-gray-500 ml-1">°C</span>
-              </p>
-            </div>
-
-            {/* Pressão */}
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Pressão</p>
-              <p className="text-2xl font-bold text-blue-500">
-                {sensorData.pressao?.toFixed(2)}
-                <span className="text-sm font-normal text-gray-500 ml-1">bar</span>
-              </p>
-            </div>
-
-            {/* Umidade */}
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Umidade</p>
-              <p className="text-2xl font-bold text-cyan-500">
-                {sensorData.umidade?.toFixed(2)}
-                <span className="text-sm font-normal text-gray-500 ml-1">%</span>
-              </p>
-            </div>
-
-            {/* Sensor de Presença */}
-            <div className="bg-white rounded-lg p-3 border border-gray-200">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Sensor de Presença</p>
-              <span
-                className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-semibold ${
-                  sensorData.sensor_presenca
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-200 text-gray-500"
-                }`}
-              >
-                {sensorData.sensor_presenca ? "Acionado" : "Desacionado"}
-              </span>
-            </div>
-
-            {/* Trava de Segurança */}
-            <div className="bg-white rounded-lg p-3 border border-gray-200 col-span-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Trava de Segurança</p>
-              <span
-                className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-semibold ${
-                  sensorData.trava_seguranca
-                    ? "bg-red-100 text-red-700"
-                    : "bg-green-100 text-green-700"
-                }`}
-              >
-                {sensorData.trava_seguranca ? "Travado" : "Destravado"}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+    )
 }

@@ -1,9 +1,46 @@
 services:
 
+  opcua-server:
+    build: ./opcua-server
+    container_name: opcua-server
+    ports:
+      - "4840:4840"
+    networks:
+      - ifaci-net
+
+  api:
+    build: ./api
+    container_name: api-ifaci
+    ports:
+      - "8080:8080"
+    networks:
+      - ifaci-net
+    depends_on:
+      - opcua-server
+
   nodered-ifaci:
     image: nodered/node-red
     container_name: nodered-ifaci
     ports:
       - "1880:1880"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nodered:/data
+    networks:
+      - ifaci-net
+    depends_on:
+      - opcua-server
+      - api
+
+  frontend:
+    build: ./frontend
+    container_name: frontend-ifaci
+    ports:
+      - "3000:3000"
+    networks:
+      - ifaci-net
+    depends_on:
+      - api
+
+networks:
+  ifaci-net:
+    driver: bridge
